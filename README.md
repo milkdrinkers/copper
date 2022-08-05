@@ -18,7 +18,7 @@ This is meant to be used as a library, but a standalone is also in the works (ma
 Currently, this is being used as the launcher backend for the glowsquid launcher.
 
 ## Features
-- [x] can actually downloda minecraft
+- [x] can actually download minecraft
 - [x] parses version manifests for you
 - [x] comes with a CLI (WIP, authentication still needs to be added to the CLI)
 - [x] proper error handling
