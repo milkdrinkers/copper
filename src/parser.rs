@@ -236,9 +236,9 @@ impl JavaArguments {
                                     panic!("unrecognised windows version: {:?}, please report to https://github.com/glowsquid-launcher/minecraft-rs/issues with the version you are using", ver);
                                 }
 
-                                Ok(IsWindows10OrGreater().unwrap_or(false))
+                                IsWindows10OrGreater().unwrap_or(false)
                             } else {
-                                Ok(true)
+                                true
                             }
                         }
                         #[cfg(not(target_os = "windows"))]
