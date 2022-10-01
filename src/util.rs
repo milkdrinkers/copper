@@ -1,4 +1,3 @@
-use std::ops::{Deref, DerefMut, Div};
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Duration;
@@ -69,7 +68,7 @@ impl FromStr for MavenIdentifier {
     type Err = MavenIdentifierParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut parts = s.split(":");
+        let mut parts = s.split(':');
 
         let [group_id, artifact_id, version] = parts
             .next()
@@ -96,7 +95,7 @@ pub async fn create_library_download(
 
     let maven_url = format!(
         "{}/{}/{}/{}-{}.jar",
-        identifier.group_id.replace(".", "/"),
+        identifier.group_id.replace('.', "/"),
         identifier.artifact_id,
         identifier.version,
         identifier.artifact_id,

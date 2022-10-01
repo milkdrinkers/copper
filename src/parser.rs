@@ -35,7 +35,7 @@ impl GameArguments {
         })?;
 
         if !rules_passed {
-            return Ok(None);
+            Ok(None)
         } else {
             Ok(Some(Self::parse_string_argument(
                 launcher_arguments,
@@ -54,18 +54,25 @@ impl GameArguments {
     ) -> Result<String, JavaArgumentsError> {
         trace!("Parsing string argument: {:?}", &argument);
 
-        return if argument.starts_with("${") && argument.ends_with("}") {
+        if argument.starts_with("${") && argument.ends_with('}') {
             let dynamic_argument = &argument[2..argument.len() - 1].to_string();
-            Ok(Self::match_dynamic_argument(launcher_arguments, dynamic_argument)?.to_string())
+            Ok(Self::match_dynamic_argument(
+                launcher_arguments,
+                dynamic_argument,
+            )?)
         } else if argument == "--clientId" {
-            if let Some(_) = &launcher_arguments.authentication_details.client_id {
+            if launcher_arguments
+                .authentication_details
+                .client_id
+                .is_some()
+            {
                 Ok(argument)
             } else {
                 Ok("".to_string()) // dont put in argument if there is no client id
             }
         } else {
             Ok(argument)
-        };
+        }
     }
 
     #[tracing::instrument]
@@ -90,11 +97,11 @@ impl GameArguments {
                 .username
                 .to_owned(),
             "version_name" => launcher_arguments.version_name.to_owned(),
-            "game_directory" => canonicalize(launcher_arguments.game_directory.to_owned())?
+            "game_directory" => canonicalize(&launcher_arguments.game_directory)?
                 .to_str()
                 .ok_or(JavaArgumentsError::NotValidUtf8Path)?
                 .to_owned(),
-            "assets_root" => canonicalize(launcher_arguments.assets_directory.to_owned())?
+            "assets_root" => canonicalize(&launcher_arguments.assets_directory)?
                 .to_str()
                 .ok_or(JavaArgumentsError::NotValidUtf8Path)?
                 .to_owned(),
@@ -150,10 +157,10 @@ impl GameArguments {
         // based of the 1.18 json
         match rule.action {
             Action::Allow => {
-                if let Some(_) = rule.features.is_demo_user {
-                    return Ok(launcher_arguments.authentication_details.is_demo_user);
-                } else if let Some(_) = rule.features.has_custom_resolution {
-                    return Ok(launcher_arguments.custom_resolution.is_some());
+                if rule.features.is_demo_user.is_some() {
+                    Ok(launcher_arguments.authentication_details.is_demo_user)
+                } else if rule.features.has_custom_resolution.is_some() {
+                    Ok(launcher_arguments.custom_resolution.is_some())
                 } else {
                     Err(JavaArgumentsError::UnrecognisedAllowRule)
                 }
@@ -179,10 +186,9 @@ impl JavaArguments {
             .replace(
                 "${natives_directory}",
                 //TODO: Add compat with mc version <= 1.16.5 which uses <version>/natives
-                &canonicalize(&launcher_arguments.libraries_directory)?
+                canonicalize(&launcher_arguments.libraries_directory)?
                     .to_str()
-                    .ok_or(JavaArgumentsError::NotValidUtf8Path)?
-                    .to_string(),
+                    .ok_or(JavaArgumentsError::NotValidUtf8Path)?,
             )
             .replace("${launcher_name}", &launcher_arguments.client_branding)
             .replace("${launcher_version}", &launcher_arguments.launcher_name)
@@ -249,7 +255,7 @@ impl JavaArguments {
                     };
                 }
 
-                if current_allow == false {
+                if !current_allow {
                     return Ok(false);
                 }
 
@@ -288,7 +294,7 @@ impl JavaArguments {
                 down.to_owned()
             } else {
                 create_library_download(
-                    &library.url.as_ref().unwrap(),
+                    library.url.as_ref().unwrap(),
                     &library.name,
                     client.clone(),
                 )
