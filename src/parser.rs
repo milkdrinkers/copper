@@ -170,9 +170,10 @@ impl JavaArguments {
         launcher_arguments: &Launcher,
         version_manifest: &Version,
         argument: String,
-        client: reqwest::Client
+        client: reqwest::Client,
     ) -> Result<String, JavaArgumentsError> {
-        let classpath = Self::create_classpath(version_manifest, launcher_arguments, client).await?;
+        let classpath =
+            Self::create_classpath(version_manifest, launcher_arguments, client).await?;
 
         Ok(argument
             .replace(
@@ -198,7 +199,7 @@ impl JavaArguments {
         launcher_arguments: &Launcher,
         version_manifest: &Version,
         argument: &JvmClass,
-        client: reqwest::Client
+        client: reqwest::Client,
     ) -> Result<Option<String>, JavaArgumentsError> {
         for rule in &argument.rules {
             if !Self::check_rule(rule)? {
@@ -214,7 +215,7 @@ impl JavaArguments {
                     Value::String(str) => str.to_string(),
                     Value::StringArray(array) => array.join(" "),
                 },
-                client
+                client,
             )
             .await?,
         ))
@@ -268,7 +269,7 @@ impl JavaArguments {
     async fn create_classpath(
         version_manifest: &Version,
         launcher_arguments: &Launcher,
-        client: reqwest::Client
+        client: reqwest::Client,
     ) -> Result<Vec<String>, JavaArgumentsError> {
         let mut cp = vec![];
 
@@ -286,7 +287,12 @@ impl JavaArguments {
             let download = if let Some(down) = &library.downloads {
                 down.to_owned()
             } else {
-                create_library_download(&library.url.as_ref().unwrap(), &library.name, client.clone()).await?
+                create_library_download(
+                    &library.url.as_ref().unwrap(),
+                    &library.name,
+                    client.clone(),
+                )
+                .await?
             };
 
             cp.push(

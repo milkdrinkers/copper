@@ -29,4 +29,4 @@ itertools = "0.10"
 
 # why do you have to do this mojang
 [target.'cfg(target_os = "windows")'.dependencies]
-winsafe = { version = "0.0.10", features = ["kernel"] }
+winsafe = { version = "0.0.11", features = ["kernel"] }
