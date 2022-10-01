@@ -20,14 +20,8 @@ Currently, this is being used as the launcher backend for the glowsquid launcher
 ## Features
 - [x] can actually download minecraft
 - [x] parses version manifests for you
-- [x] comes with a CLI (WIP, authentication still needs to be added to the CLI)
 - [x] proper error handling
 
 ## Testing
 
-Testing basically works by:
-
-- run something in minecraft CLI
-- see if it makes sense
-
-What makes sense should make sense for the launcher
+TODO: refactor testing
