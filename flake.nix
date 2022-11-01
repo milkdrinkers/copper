@@ -104,6 +104,16 @@
           nativeBuildInputs = with pkgs; [
             rustTC
             rnix-lsp
+            nodejs
+
+            pkg-config
+            libsoup
+            openssl
+            libressl
+            webkitgtk
+            gtk3-x11
+            gtksourceview
+            libayatana-appindicator-gtk3
           ];
         };
       });
