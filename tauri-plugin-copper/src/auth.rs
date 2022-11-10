@@ -27,11 +27,11 @@ pub async fn get_ms_token(
 
 #[command]
 pub async fn get_auth_data(
-    auth_info: AuthToken,
+    auth_token: AuthToken,
     auth: tauri::State<'_, Auth>,
 ) -> Result<AuthData, AuthDataError> {
     let xbox_token = auth
-        .authenticate_xbox_live(&auth_info)
+        .authenticate_xbox_live(&auth_token)
         .await
         .map_err(InternalReqwestError)?;
 
@@ -60,7 +60,7 @@ pub async fn get_auth_data(
             MinecraftProfileError::NotFound => AuthDataError::NotFound,
         })?;
 
-    Ok(auth.create_auth_data(&auth_info, &minecraft_profile, &xbox_token))
+    Ok(auth.create_auth_data(&auth_info, &minecraft_profile, &auth_token, &xbox_token))
 }
 
 #[derive(Error, Debug, Serialize)]

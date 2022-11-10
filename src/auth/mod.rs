@@ -256,10 +256,12 @@ impl Auth {
         &self,
         minecraft_token: &MinecraftToken,
         minecraft_profile: &MinecraftProfile,
+        microsoft_token: &AuthToken,
         xbox_token: &XboxToken,
     ) -> AuthData {
         AuthData {
             access_token: minecraft_token.access_token.clone(),
+            refresh_token: microsoft_token.refresh_token.clone(),
             username: minecraft_profile.name.clone(),
             uuid: minecraft_profile.id.clone(),
             // TODO: figure out of this is correct or not (I forgor :skull:)

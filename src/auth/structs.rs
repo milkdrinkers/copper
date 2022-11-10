@@ -111,6 +111,7 @@ pub type Cape = Skin;
 #[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct AuthData {
     pub access_token: String,
+    pub refresh_token: String,
     pub uuid: String,
     pub username: String,
     pub xuid: String,

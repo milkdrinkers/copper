@@ -30,8 +30,15 @@ Currently, this is being used as the launcher backend for the Glowsquid launcher
 - [x] parses version manifests for you
 - [x] proper error handling
 
+## TODO
+
+- Ability to refresh existing tokens
+- Full tauri bindings
+
 ## Testing
+
 TODO: refactor testing
 
 ## License
+
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fglowsquid-launcher%2Fcopper.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fglowsquid-launcher%2Fcopper?ref=badge_large)
