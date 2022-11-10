@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::process::{ExitStatus, Stdio};
 
 use crate::assets::structs::version::Version;
+use crate::auth::structs::AuthData;
 use crate::errors::LauncherError;
 use crate::parser::JavaArguments;
 use crate::{assets, parser::GameArguments};
@@ -13,10 +14,10 @@ use tracing::{debug, trace};
 
 #[derive(Default, Debug, Clone)]
 pub struct AuthenticationDetails {
+    pub auth_details: AuthData,
     pub username: String,
     pub uuid: String,
     pub access_token: String,
-    pub xbox_uid: String,
     pub client_id: Option<String>,
     pub is_demo_user: bool,
 }

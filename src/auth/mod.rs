@@ -252,11 +252,20 @@ impl Auth {
         &self,
         minecraft_token: &MinecraftToken,
         minecraft_profile: &MinecraftProfile,
+        xbox_token: &XboxToken,
     ) -> AuthData {
         AuthData {
             access_token: minecraft_token.access_token.clone(),
             username: minecraft_profile.name.clone(),
             uuid: minecraft_profile.id.clone(),
+            // TODO: figure out of this is correct or not (I forgor :skull:)
+            xuid: xbox_token
+                .display_claims
+                .xui
+                .get(0)
+                .expect("Failed to get xbox UID")
+                .uhs
+                .clone(),
         }
     }
 }

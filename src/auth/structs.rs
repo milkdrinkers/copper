@@ -108,9 +108,10 @@ pub struct Skin {
 
 pub type Cape = Skin;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct AuthData {
     pub access_token: String,
     pub uuid: String,
     pub username: String,
+    pub xuid: String,
 }

@@ -114,7 +114,8 @@ impl GameArguments {
             "clientid" => client_id,
             "auth_xuid" => launcher_arguments
                 .authentication_details
-                .xbox_uid
+                .auth_details
+                .xuid
                 .to_owned(),
             // we assume that the user is a microsoft account
             "user_type" => "msa".to_string(),
