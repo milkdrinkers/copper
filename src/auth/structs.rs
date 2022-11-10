@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::errors::AuthTokenError;
+use crate::errors::{InternalAuthTokenError, InternalReqwestError};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DeviceCode {
@@ -12,10 +12,10 @@ pub struct DeviceCode {
     pub message: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum AuthTokenRes {
-    Token(AuthToken),
-    ExpectedError(AuthTokenError),
+#[derive(Debug, Serialize)]
+pub enum AuthTokenError {
+    ExpectedError(InternalAuthTokenError),
+    ReqwestError(InternalReqwestError),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

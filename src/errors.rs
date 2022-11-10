@@ -1,8 +1,34 @@
-use std::fmt::{Display, Formatter};
-
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
+use std::error::Error as StdError;
+use std::fmt::{Display, Formatter};
 use thiserror::Error;
+
+#[derive(Debug)]
+pub struct InternalReqwestError(pub reqwest::Error);
+
+impl Display for InternalReqwestError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl Serialize for InternalReqwestError {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.0.to_string())
+    }
+}
+
+impl From<reqwest::Error> for InternalReqwestError {
+    fn from(err: reqwest::Error) -> Self {
+        InternalReqwestError(err)
+    }
+}
+
+impl StdError for InternalReqwestError {}
 
 #[derive(Error, Debug)]
 /// Errors relating to downloading and parsing a minecraft version manifest
@@ -233,17 +259,17 @@ pub enum CreateLibraryDownloadError {
     CannotParseContentLength,
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Serialize)]
 pub enum DeviceCodeError {
     #[error("auth_error.request_error(error={})", .0)]
-    RequestError(#[from] reqwest::Error),
+    RequestError(#[from] InternalReqwestError),
 
     #[error("auth_error.microsoft_error(error={})", .0)]
     MicrosoftError(String),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AuthTokenError {
+pub struct InternalAuthTokenError {
     pub error: AuthTokenErrorType,
     pub error_description: String,
     pub error_uri: String,
@@ -262,10 +288,10 @@ pub enum AuthTokenErrorType {
     BadVerificationCode,
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Serialize)]
 pub enum XstsError {
     #[error("xsts_error.request_error(error={})", .0)]
-    RequestError(#[from] reqwest::Error),
+    RequestError(#[from] InternalReqwestError),
 
     #[error("xsts_error.microsoft_error(error={})", .0)]
     MicrosoftError(XstsMsError),

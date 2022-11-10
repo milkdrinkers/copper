@@ -8,13 +8,13 @@ use tokio::time::{sleep, Duration};
 use crate::{
     auth::structs::JWTEntitlements,
     errors::{
-        AuthTokenError, AuthTokenErrorType, DeviceCodeError, JWTVerificationError,
-        MinecraftProfileError, XstsError,
+        AuthTokenErrorType, DeviceCodeError, InternalAuthTokenError, InternalReqwestError,
+        JWTVerificationError, MinecraftProfileError, XstsError,
     },
 };
 
 use self::structs::{
-    AuthData, AuthToken, AuthTokenRes, DeviceCode, MinecraftProductAttachment, MinecraftProfile,
+    AuthData, AuthToken, AuthTokenError, DeviceCode, MinecraftProductAttachment, MinecraftProfile,
     MinecraftToken, XboxToken, XstsToken,
 };
 pub mod structs;
@@ -36,9 +36,9 @@ EYblHbogFGPRFU++NrSQRX0CAwEAAQ==
 
 pub struct Auth {
     /// The client id from azure
-    client_id: String,
+    pub client_id: String,
     /// The reqwest http client
-    http_client: reqwest::Client,
+    pub http_client: reqwest::Client,
 }
 
 impl Auth {
@@ -51,12 +51,15 @@ impl Auth {
                 ("scope", "XboxLive.signin offline_access"), // xboxlive is needed for checking if the user actually has minecraft and stuff, offline_access is for refresh token
             ])
             .send()
-            .await?;
+            .await
+            .map_err(InternalReqwestError)?;
 
         if res.status() == StatusCode::OK {
-            Ok(res.json().await?)
+            Ok(res.json().await.map_err(InternalReqwestError)?)
         } else {
-            Err(DeviceCodeError::MicrosoftError(res.text().await?))
+            Err(DeviceCodeError::MicrosoftError(
+                res.text().await.map_err(InternalReqwestError)?,
+            ))
         }
     }
 
@@ -64,7 +67,7 @@ impl Auth {
     pub fn pull_for_auth(
         &self,
         device_code: &DeviceCode,
-    ) -> impl Stream<Item = Result<AuthTokenRes, reqwest::Error>> {
+    ) -> impl Stream<Item = Result<AuthToken, AuthTokenError>> {
         let request = self
             .http_client
             .post("https://login.microsoftonline.com/consumers/oauth2/v2.0/token")
@@ -81,20 +84,20 @@ impl Auth {
             loop {
                 // Since the body is _not_ a stream, it can be cloned
                 let req = request.try_clone().expect("Cannot clone request");
-                let res = req.send().await?;
+                let res = req.send().await.map_err(|e| AuthTokenError::ReqwestError(e.into()))?;
                 if res.status() == StatusCode::OK {
-                    yield AuthTokenRes::Token(res.json().await?);
+                    yield res.json::<AuthToken>().await.map_err(|e| AuthTokenError::ReqwestError(e.into()))?;
                     break;
                 } else {
-                    let err: AuthTokenError = res.json().await?;
+                    let err: InternalAuthTokenError = res.json().await.map_err(|e| AuthTokenError::ReqwestError(e.into()))?;
 
                     match err.error {
                         AuthTokenErrorType::AuthorizationPending => {
-                            yield AuthTokenRes::ExpectedError(err);
+                            Err(AuthTokenError::ExpectedError(err))?;
                             sleep(Duration::from_secs(interval)).await;
                         },
                         _ => {
-                            yield AuthTokenRes::ExpectedError(err);
+                            Err(AuthTokenError::ExpectedError(err))?;
                             break;
                         },
 
@@ -109,27 +112,24 @@ impl Auth {
     pub async fn get_microsoft_auth_token(
         &self,
         device_code: &DeviceCode,
-    ) -> Result<AuthTokenRes, reqwest::Error> {
+    ) -> Result<AuthToken, AuthTokenError> {
         let stream = self.pull_for_auth(device_code);
         pin_mut!(stream);
 
-        let auth_token = 'block: {
-            while let Some(v) = stream.next().await {
-                let v = v?;
-
-                match &v {
-                    AuthTokenRes::ExpectedError(err) => match err.error {
+        'block: {
+            while let Some(r) = stream.next().await {
+                match &r {
+                    Err(AuthTokenError::ExpectedError(err)) => match err.error {
                         AuthTokenErrorType::AuthorizationPending => continue,
-                        _ => break 'block v,
+                        _ => break 'block r,
                     },
-                    AuthTokenRes::Token(_) => break 'block v,
+                    Err(AuthTokenError::ReqwestError(_)) => break 'block r,
+                    Ok(_) => break 'block r,
                 }
             }
 
             unreachable!()
-        };
-
-        Ok(auth_token)
+        }
     }
 
     pub async fn authenticate_xbox_live(
@@ -168,20 +168,21 @@ impl Auth {
                 "TokenType": "JWT"
             }))
             .send()
-            .await?;
+            .await
+            .map_err(InternalReqwestError)?;
 
         if res.status() == StatusCode::OK {
-            Ok(res.json().await.map_err(XstsError::RequestError)?)
+            Ok(res.json().await.map_err(InternalReqwestError)?)
         } else {
             Err(XstsError::MicrosoftError(
-                res.json().await.map_err(XstsError::RequestError)?,
+                res.json().await.map_err(InternalReqwestError)?,
             ))
         }
     }
 
     pub async fn get_minecraft_token(
         &self,
-        xsts_token: &XboxToken,
+        xsts_token: &XstsToken,
     ) -> Result<MinecraftToken, reqwest::Error> {
         self.http_client
             .post("https://api.minecraftservices.com/authentication/login_with_xbox")
@@ -294,10 +295,16 @@ mod tests {
 
         let auth_token = 'block: {
             while let Some(v) = stream.next().await {
-                println!("{:?}", v);
-                match v.unwrap() {
-                    AuthTokenRes::ExpectedError(_) => continue,
-                    AuthTokenRes::Token(token) => break 'block token,
+                println!("Got value: {:?}", v);
+                match v {
+                    Ok(v) => break 'block v,
+                    Err(AuthTokenError::ExpectedError(e)) => match e.error {
+                        AuthTokenErrorType::AuthorizationPending => continue,
+                        _ => panic!("Could not get token: {:?}", e),
+                    },
+                    Err(AuthTokenError::ReqwestError(e)) => {
+                        panic!("Could not get token due to reqwest error: {:?}", e)
+                    }
                 }
             }
 

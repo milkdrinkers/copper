@@ -4,7 +4,8 @@
 		"assets",
 		"standalone",
 		"structs/version",
-		"auth"
+		"auth",
+		"tauri"
 	],
 	"files.exclude": {
 		"**/.git": true,
@@ -24,6 +25,7 @@
 		"Mojang",
 		"reqwest",
 		"signin",
+		"tauri",
 		"Wakatime",
 		"xboxlive",
 		"Xsts"
