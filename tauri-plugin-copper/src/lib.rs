@@ -35,7 +35,7 @@ pub fn init<R: Runtime>(ms_client_id: String) -> TauriPlugin<R> {
         .invoke_handler(tauri::generate_handler![
             get_auth_info,
             get_ms_token,
-            get_mc_token
+            get_auth_data
         ])
         .setup(|app| {
             app.manage(Auth {

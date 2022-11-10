@@ -30,6 +30,32 @@ impl From<reqwest::Error> for InternalReqwestError {
 
 impl StdError for InternalReqwestError {}
 
+#[derive(Debug)]
+pub struct InternalJWTError(pub jwt_simple::Error);
+
+impl Display for InternalJWTError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl Serialize for InternalJWTError {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.0.to_string())
+    }
+}
+
+impl From<jwt_simple::Error> for InternalJWTError {
+    fn from(err: jwt_simple::Error) -> Self {
+        InternalJWTError(err)
+    }
+}
+
+impl StdError for InternalJWTError {}
+
 #[derive(Error, Debug)]
 /// Errors relating to downloading and parsing a minecraft version manifest
 pub enum VersionError {
@@ -291,7 +317,7 @@ pub enum AuthTokenErrorType {
 #[derive(Error, Debug, Serialize)]
 pub enum XstsError {
     #[error("xsts_error.request_error(error={})", .0)]
-    RequestError(#[from] InternalReqwestError),
+    ReqwestError(#[from] InternalReqwestError),
 
     #[error("xsts_error.microsoft_error(error={})", .0)]
     MicrosoftError(XstsMsError),
@@ -331,18 +357,18 @@ impl Display for XErr {
     }
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Serialize)]
 pub enum JWTVerificationError {
     #[error("jwt_error.request_error(error={})", .0)]
-    RequestError(#[from] reqwest::Error),
+    RequestError(#[from] InternalReqwestError),
     #[error("jwt_error.verify_error(error={})", .0)]
-    VerificationError(#[from] jwt_simple::Error),
+    VerificationError(#[from] InternalJWTError),
 }
 
 #[derive(Error, Debug)]
 pub enum MinecraftProfileError {
     #[error("minecraft_profile_error.request_error(error={})", .0)]
-    RequestError(#[from] reqwest::Error),
+    ReqwestError(#[from] reqwest::Error),
     #[error("minecraft_profile_error.profile_not_found")]
     /// Note that Xbox Game Pass users who haven't logged into the new Minecraft Launcher at least once will not return a profile, and will need to login once after activating Xbox Game Pass to setup their Minecraft username.
     NotFound,

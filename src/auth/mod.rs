@@ -8,8 +8,8 @@ use tokio::time::{sleep, Duration};
 use crate::{
     auth::structs::JWTEntitlements,
     errors::{
-        AuthTokenErrorType, DeviceCodeError, InternalAuthTokenError, InternalReqwestError,
-        JWTVerificationError, MinecraftProfileError, XstsError,
+        AuthTokenErrorType, DeviceCodeError, InternalAuthTokenError, InternalJWTError,
+        InternalReqwestError, JWTVerificationError, MinecraftProfileError, XstsError,
     },
 };
 
@@ -214,13 +214,17 @@ impl Auth {
             .get("https://api.minecraftservices.com/entitlements/mcstore")
             .bearer_auth(&minecraft_token.access_token)
             .send()
-            .await?
+            .await
+            .map_err(InternalReqwestError)?
             .json()
-            .await?;
+            .await
+            .map_err(InternalReqwestError)?;
 
         let public_key =
             RS256PublicKey::from_pem(JWT_PUBLIC_KEY).expect("Could not parse public key");
-        let claims = public_key.verify_token::<JWTEntitlements>(&json.signature, None)?;
+        let claims = public_key
+            .verify_token::<JWTEntitlements>(&json.signature, None)
+            .map_err(InternalJWTError)?;
 
         Ok(!json.items.is_empty()
             && claims
