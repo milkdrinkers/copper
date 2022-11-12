@@ -35,7 +35,16 @@ export interface AuthData {
  * @returns {Promise<DeviceCode>} The device information. use this in {@link getMicrosoftToken}
  */
 export async function getAuthenticationInfo(): Promise<DeviceCode> {
-  return await invoke('plugin:copper|get_auth_info')
+  const v: any = await invoke('plugin:copper|get_auth_info')
+
+  return ({
+    deviceCode: v.device_code,
+    userCode: v.user_code,
+    verificationUri: v.verification_uri,
+    expiresIn: v.expires_in,
+    interval: v.interval,
+    message: v.message,
+  })
 }
 
 /**
@@ -45,8 +54,16 @@ export async function getAuthenticationInfo(): Promise<DeviceCode> {
  * @returns {Promise<AuthToken>} The authentication token information. Use this in {@link getAuthData}.
  */
 export async function getMicrosoftToken(authInfo: DeviceCode): Promise<AuthToken> {
-  return await invoke('plugin:copper|get_ms_token', {
+  const v: any = await invoke('plugin:copper|get_ms_token', {
     authInfo
+  })
+
+  return ({
+    tokenType: v.token_type,
+    scope: v.scope,
+    expiresIn: v.expires_in,
+    accessToken: v.access_token,
+    refreshToken: v.refresh_token,
   })
 }
 
@@ -56,8 +73,16 @@ export async function getMicrosoftToken(authInfo: DeviceCode): Promise<AuthToken
  * @returns A new auth token to be used in {@link getAuthData}
  */
 export async function refreshAuthToken(authData: AuthData): Promise<AuthToken> {
-  return await invoke('plugin:copper|refresh_ms_token', {
+  const v: any = await invoke('plugin:copper|refresh_ms_token', {
     authData
+  })
+
+  return ({
+    tokenType: v.token_type,
+    scope: v.scope,
+    expiresIn: v.expires_in,
+    accessToken: v.access_token,
+    refreshToken: v.refresh_token,
   })
 }
 
@@ -68,7 +93,16 @@ export async function refreshAuthToken(authData: AuthData): Promise<AuthToken> {
  * @returns {Promise<AuthData>} The authentication data. Store this somewhere safe, and use it when launching minecraft. Remember to rather refresh the access_token rather than getting another one via the device flow.
  */
 export async function getAuthData(auth_info: AuthToken): Promise<AuthData> {
-  return await invoke('plugin:copper|get_auth_data', {
+  const v: any = await invoke('plugin:copper|get_auth_data', {
     auth_info
+  })
+
+  return ({
+    accessToken: v.access_token,
+    refreshToken: v.refresh_token,
+    uuid: v.uuid,
+    username: v.username,
+    expiresAt: v.expires_at,
+    xuid: v.xuid,
   })
 }
