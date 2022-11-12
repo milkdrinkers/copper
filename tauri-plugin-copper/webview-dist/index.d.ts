@@ -33,6 +33,7 @@ export declare function getAuthenticationInfo(): Promise<DeviceCode>;
  * @returns {Promise<AuthToken>} The authentication token information. Use this in {@link getAuthData}.
  */
 export declare function getMicrosoftToken(authInfo: DeviceCode): Promise<AuthToken>;
+export declare function refreshAuthToken(authToken: AuthData): Promise<AuthToken>;
 /**
  * Gets the necessary authentication data for launching minecraft.
  *

@@ -46,6 +46,12 @@ export async function getMicrosoftToken(authInfo: DeviceCode): Promise<AuthToken
   })
 }
 
+export async function refreshAuthToken(authToken: AuthData): Promise<AuthToken> {
+  return await invoke('plugin:copper|refresh_ms_token', {
+    authToken
+  })
+}
+
 /**
  * Gets the necessary authentication data for launching minecraft.
  *

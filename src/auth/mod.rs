@@ -1,4 +1,4 @@
-use async_stream::try_stream;
+use async_stream::stream;
 use futures::{pin_mut, Stream, StreamExt};
 use jwt_simple::prelude::*;
 use reqwest::StatusCode;
@@ -80,24 +80,29 @@ impl Auth {
 
         let interval = device_code.interval.into();
 
-        try_stream! {
+        stream! {
             loop {
                 // Since the body is _not_ a stream, it can be cloned
                 let req = request.try_clone().expect("Cannot clone request");
-                let res = req.send().await.map_err(|e| AuthTokenError::ReqwestError(e.into()))?;
+                let res = req.send().await.map_err(|e| AuthTokenError::ReqwestError(e.into()));
+                if res.is_err() {
+                    yield Err(res.unwrap_err());
+                    break;
+                }
+                let res = res.unwrap();
                 if res.status() == StatusCode::OK {
-                    yield res.json::<AuthToken>().await.map_err(|e| AuthTokenError::ReqwestError(e.into()))?;
+                    yield res.json::<AuthToken>().await.map_err(|e| AuthTokenError::ReqwestError(e.into()));
                     break;
                 } else {
                     let err: InternalAuthTokenError = res.json().await.map_err(|e| AuthTokenError::ReqwestError(e.into()))?;
 
                     match err.error {
                         AuthTokenErrorType::AuthorizationPending => {
-                            Err(AuthTokenError::ExpectedError(err))?;
+                            yield Err(AuthTokenError::ExpectedError(err));
                             sleep(Duration::from_secs(interval)).await;
                         },
                         _ => {
-                            Err(AuthTokenError::ExpectedError(err))?;
+                            yield Err(AuthTokenError::ExpectedError(err));
                             break;
                         },
 
@@ -132,7 +137,7 @@ impl Auth {
         }
     }
 
-    pub async fn authenticate_xbox_live(
+    pub async fn get_xbox_auth_token(
         &self,
         token: &AuthToken,
     ) -> Result<XboxToken, reqwest::Error> {
@@ -274,6 +279,24 @@ impl Auth {
                 .clone(),
         }
     }
+
+    /// Refreshes the current auth token with a new one
+    ///
+    /// You will have to re-run the auth flow from `get_xbox_auth_token` if this succeeds, else, you will have to re-run the entire auth flow.
+    pub async fn refresh_token(&self, auth_data: &AuthData) -> Result<AuthToken, reqwest::Error> {
+        self.http_client
+            .post("https://login.microsoftonline.com/consumers/oauth2/v2.0/token")
+            .form(&[
+                ("client_id", &*self.client_id),
+                ("refresh_token", &*auth_data.refresh_token),
+                ("grant_type", "refresh_token"),
+                ("scope", "XboxLive.signin offline_access"),
+            ])
+            .send()
+            .await?
+            .json()
+            .await
+    }
 }
 
 #[cfg(test)]
@@ -295,7 +318,7 @@ mod tests {
     }
 
     #[allow(dead_code)]
-    // #[tokio::test]
+    #[tokio::test]
     async fn test_full_flow() {
         let auth = Auth {
             client_id: "2aa32806-92e3-4242-babc-392ac0f0fd30".to_string(),
@@ -305,31 +328,12 @@ mod tests {
         let code = auth.create_device_code().await.unwrap();
         println!("Code: {} | Goto: {}", code.user_code, code.verification_uri);
 
-        let stream = auth.pull_for_auth(&code);
-        pin_mut!(stream);
-
-        let auth_token = 'block: {
-            while let Some(v) = stream.next().await {
-                println!("Got value: {:?}", v);
-                match v {
-                    Ok(v) => break 'block v,
-                    Err(AuthTokenError::ExpectedError(e)) => match e.error {
-                        AuthTokenErrorType::AuthorizationPending => continue,
-                        _ => panic!("Could not get token: {:?}", e),
-                    },
-                    Err(AuthTokenError::ReqwestError(e)) => {
-                        panic!("Could not get token due to reqwest error: {:?}", e)
-                    }
-                }
-            }
-
-            panic!("Could not get token");
-        };
+        let auth_token = auth.get_microsoft_auth_token(&code).await.unwrap();
 
         println!("{:?}", auth_token);
 
         let xbl_token = auth
-            .authenticate_xbox_live(&auth_token)
+            .get_xbox_auth_token(&auth_token)
             .await
             .expect("Could not authenticate with xbox live");
 
@@ -366,5 +370,21 @@ mod tests {
             .expect("Could not get minecraft profile");
 
         println!("{:?}", minecraft_profile);
+
+        let auth_data = auth.create_auth_data(
+            &minecraft_token,
+            &minecraft_profile,
+            &auth_token,
+            &xbl_token,
+        );
+
+        println!("{:?}", auth_data);
+
+        let new_auth_token = auth
+            .refresh_token(&auth_data)
+            .await
+            .expect("Could not refresh token");
+
+        println!("{:?}", new_auth_token);
     }
 }

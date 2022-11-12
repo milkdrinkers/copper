@@ -31,7 +31,7 @@ pub async fn get_auth_data(
     auth: tauri::State<'_, Auth>,
 ) -> Result<AuthData, AuthDataError> {
     let xbox_token = auth
-        .authenticate_xbox_live(&auth_token)
+        .get_xbox_auth_token(&auth_token)
         .await
         .map_err(InternalReqwestError)?;
 
@@ -61,6 +61,16 @@ pub async fn get_auth_data(
         })?;
 
     Ok(auth.create_auth_data(&auth_info, &minecraft_profile, &auth_token, &xbox_token))
+}
+
+#[command]
+pub async fn refresh_ms_token(
+    auth_data: AuthData,
+    auth: tauri::State<'_, Auth>,
+) -> Result<AuthToken, InternalReqwestError> {
+    auth.refresh_token(&auth_data)
+        .await
+        .map_err(InternalReqwestError)
 }
 
 #[derive(Error, Debug, Serialize)]
