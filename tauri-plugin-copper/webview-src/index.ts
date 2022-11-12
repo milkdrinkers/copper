@@ -74,7 +74,7 @@ export async function getMicrosoftToken(authInfo: DeviceCode): Promise<AuthToken
  */
 export async function refreshAuthToken(authData: AuthData): Promise<AuthToken> {
   const v: any = await invoke('plugin:copper|refresh_ms_token', {
-    auth_data: authData
+    authData
   })
 
   return ({
@@ -94,7 +94,7 @@ export async function refreshAuthToken(authData: AuthData): Promise<AuthToken> {
  */
 export async function getAuthData(authInfo: AuthToken): Promise<AuthData> {
   const v: any = await invoke('plugin:copper|get_auth_data', {
-    auth_info: authInfo
+    authInfo
   })
 
   return ({
