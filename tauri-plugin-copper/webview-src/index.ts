@@ -55,7 +55,7 @@ export async function getAuthenticationInfo(): Promise<DeviceCode> {
  */
 export async function getMicrosoftToken(authInfo: DeviceCode): Promise<AuthToken> {
   const v: any = await invoke('plugin:copper|get_ms_token', {
-    auth_info: authInfo
+    authInfo
   })
 
   return ({
