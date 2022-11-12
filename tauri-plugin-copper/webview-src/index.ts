@@ -22,6 +22,10 @@ export interface AuthData {
   refreshToken: string,
   uuid: string,
   username: string,
+  /**
+   * Remember to refresh the token after it expires
+   */
+  expiresAt: number,
   xuid: string,
 }
 
@@ -46,9 +50,14 @@ export async function getMicrosoftToken(authInfo: DeviceCode): Promise<AuthToken
   })
 }
 
-export async function refreshAuthToken(authToken: AuthData): Promise<AuthToken> {
+/**
+ * Refreshes the authentication token for usage after it has expired.
+ * @param authData The authentication data you had previously.
+ * @returns A new auth token to be used in {@link getAuthData}
+ */
+export async function refreshAuthToken(authData: AuthData): Promise<AuthToken> {
   return await invoke('plugin:copper|refresh_ms_token', {
-    authToken
+    authData
   })
 }
 

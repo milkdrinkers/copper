@@ -115,4 +115,5 @@ pub struct AuthData {
     pub uuid: String,
     pub username: String,
     pub xuid: String,
+    pub expires_at: String,
 }

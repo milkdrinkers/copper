@@ -1,9 +1,12 @@
+use std::time::{Duration as StdDuration, SystemTime};
+
 use async_stream::stream;
 use futures::{pin_mut, Stream, StreamExt};
 use jwt_simple::prelude::*;
 use reqwest::StatusCode;
 use serde_json::json;
-use tokio::time::{sleep, Duration};
+use time::{format_description::well_known::Rfc3339, Duration, OffsetDateTime};
+use tokio::time::sleep;
 
 use crate::{
     auth::structs::JWTEntitlements,
@@ -99,7 +102,7 @@ impl Auth {
                     match err.error {
                         AuthTokenErrorType::AuthorizationPending => {
                             yield Err(AuthTokenError::ExpectedError(err));
-                            sleep(Duration::from_secs(interval)).await;
+                            sleep(StdDuration::from_secs(interval)).await;
                         },
                         _ => {
                             yield Err(AuthTokenError::ExpectedError(err));
@@ -264,6 +267,11 @@ impl Auth {
         microsoft_token: &AuthToken,
         xbox_token: &XboxToken,
     ) -> AuthData {
+        let system_time: OffsetDateTime = SystemTime::now().into();
+        let expires_in = Duration::seconds(microsoft_token.expires_in as i64);
+        let new_time = system_time + expires_in;
+        let formatted_time = new_time.format(&Rfc3339).expect("Could not format date");
+
         AuthData {
             access_token: minecraft_token.access_token.clone(),
             refresh_token: microsoft_token.refresh_token.clone(),
@@ -277,6 +285,7 @@ impl Auth {
                 .expect("Failed to get xbox UID")
                 .uhs
                 .clone(),
+            expires_at: formatted_time,
         }
     }
 
