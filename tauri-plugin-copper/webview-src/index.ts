@@ -55,7 +55,14 @@ export async function getAuthenticationInfo(): Promise<DeviceCode> {
  */
 export async function getMicrosoftToken(authInfo: DeviceCode): Promise<AuthToken> {
   const v: any = await invoke('plugin:copper|get_ms_token', {
-    authInfo
+    authInfo: {
+      device_code: authInfo.deviceCode,
+      user_code: authInfo.userCode,
+      verification_uri: authInfo.verificationUri,
+      expires_in: authInfo.expiresIn,
+      interval: authInfo.interval,
+      message: authInfo.message,
+    }
   })
 
   return ({
@@ -74,7 +81,14 @@ export async function getMicrosoftToken(authInfo: DeviceCode): Promise<AuthToken
  */
 export async function refreshAuthToken(authData: AuthData): Promise<AuthToken> {
   const v: any = await invoke('plugin:copper|refresh_ms_token', {
-    authData
+    authData: {
+      access_token: authData.accessToken,
+      refresh_token: authData.refreshToken,
+      uuid: authData.uuid,
+      username: authData.username,
+      expires_at: authData.expiresAt,
+      xuid: authData.xuid,
+    }
   })
 
   return ({
@@ -94,7 +108,13 @@ export async function refreshAuthToken(authData: AuthData): Promise<AuthToken> {
  */
 export async function getAuthData(authInfo: AuthToken): Promise<AuthData> {
   const v: any = await invoke('plugin:copper|get_auth_data', {
-    authInfo
+    authInfo: {
+      token_type: authInfo.tokenType,
+      scope: authInfo.scope,
+      expires_in: authInfo.expiresIn,
+      access_token: authInfo.accessToken,
+      refresh_token: authInfo.refreshToken,
+    }
   })
 
   return ({
