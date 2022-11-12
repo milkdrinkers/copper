@@ -55,7 +55,7 @@ export async function getAuthenticationInfo(): Promise<DeviceCode> {
  */
 export async function getMicrosoftToken(authInfo: DeviceCode): Promise<AuthToken> {
   const v: any = await invoke('plugin:copper|get_ms_token', {
-    authInfo
+    device_code: authInfo
   })
 
   return ({
@@ -74,7 +74,7 @@ export async function getMicrosoftToken(authInfo: DeviceCode): Promise<AuthToken
  */
 export async function refreshAuthToken(authData: AuthData): Promise<AuthToken> {
   const v: any = await invoke('plugin:copper|refresh_ms_token', {
-    authData
+    auth_data: authData
   })
 
   return ({
@@ -89,12 +89,12 @@ export async function refreshAuthToken(authData: AuthData): Promise<AuthToken> {
 /**
  * Gets the necessary authentication data for launching minecraft.
  *
- * @param auth_info The authentication token information.
+ * @param authInfo The authentication token information.
  * @returns {Promise<AuthData>} The authentication data. Store this somewhere safe, and use it when launching minecraft. Remember to rather refresh the access_token rather than getting another one via the device flow.
  */
-export async function getAuthData(auth_info: AuthToken): Promise<AuthData> {
+export async function getAuthData(authInfo: AuthToken): Promise<AuthData> {
   const v: any = await invoke('plugin:copper|get_auth_data', {
-    auth_info
+    auth_info: authInfo
   })
 
   return ({
