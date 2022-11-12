@@ -103,17 +103,17 @@ export async function refreshAuthToken(authData: AuthData): Promise<AuthToken> {
 /**
  * Gets the necessary authentication data for launching minecraft.
  *
- * @param authInfo The authentication token information.
+ * @param authToken The authentication token information.
  * @returns {Promise<AuthData>} The authentication data. Store this somewhere safe, and use it when launching minecraft. Remember to rather refresh the access_token rather than getting another one via the device flow.
  */
-export async function getAuthData(authInfo: AuthToken): Promise<AuthData> {
+export async function getAuthData(authToken: AuthToken): Promise<AuthData> {
   const v: any = await invoke('plugin:copper|get_auth_data', {
-    authInfo: {
-      token_type: authInfo.tokenType,
-      scope: authInfo.scope,
-      expires_in: authInfo.expiresIn,
-      access_token: authInfo.accessToken,
-      refresh_token: authInfo.refreshToken,
+    authToken: {
+      token_type: authToken.tokenType,
+      scope: authToken.scope,
+      expires_in: authToken.expiresIn,
+      access_token: authToken.accessToken,
+      refresh_token: authToken.refreshToken,
     }
   })
 
