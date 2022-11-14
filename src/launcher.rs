@@ -15,9 +15,6 @@ use tracing::{debug, trace};
 #[derive(Default, Debug, Clone)]
 pub struct AuthenticationDetails {
     pub auth_details: AuthData,
-    pub username: String,
-    pub uuid: String,
-    pub access_token: String,
     pub client_id: Option<String>,
     pub is_demo_user: bool,
 }
