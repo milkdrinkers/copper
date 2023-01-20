@@ -457,7 +457,7 @@ impl Version {
         let sub_path = mappings_class
         .path
         .as_ref()
-        .expect("library doesnt have a path. Please report this bug to https://github.com/glowsquid-launcher/glowsquid/issues");
+        .expect(format!("library {} doesnt have a path.", library.name).as_str());
 
         let full_path = save_path.join(sub_path);
         debug!(
