@@ -6,6 +6,7 @@ use crate::auth::structs::AuthData;
 use crate::errors::LauncherError;
 use crate::parser::JavaArguments;
 use crate::{assets, parser::GameArguments};
+use dunce::canonicalize;
 use tokio::fs;
 use tokio::io::BufReader;
 use tokio::process::{ChildStderr, ChildStdout, Command};
@@ -106,6 +107,7 @@ impl Launcher {
         let mut process = Command::new(self.java_path.clone())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
+			.current_dir(canonicalize(self.game_directory.clone())?)
             .args(&java_args)
             .arg(main_class)
             .args(&game_args)
