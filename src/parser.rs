@@ -131,7 +131,7 @@ impl GameArguments {
                 } else {
                     "release".to_string()
                 }
-            }
+            },
             "resolution_width" if launcher_arguments.custom_resolution.is_some() => {
                 launcher_arguments
                     .custom_resolution
@@ -139,7 +139,7 @@ impl GameArguments {
                     .ok_or(JavaArgumentsError::NoCustomResolutionProvided)?
                     .width
                     .to_string()
-            }
+            },
             "resolution_height" if launcher_arguments.custom_resolution.is_some() => {
                 launcher_arguments
                     .custom_resolution
@@ -147,7 +147,7 @@ impl GameArguments {
                     .ok_or(JavaArgumentsError::NoCustomResolutionProvided)?
                     .height
                     .to_string()
-            }
+            },
             _ => {
                 return Err(JavaArgumentsError::UnrecognisedGameArgument(
                     dynamic_argument.to_string(),
@@ -197,14 +197,29 @@ impl JavaArguments {
                     .to_str()
                     .ok_or(JavaArgumentsError::NotValidUtf8Path)?,
             )
+			.replace(
+                "${library_directory}",
+                canonicalize(&launcher_arguments.libraries_directory)?
+                    .to_str()
+                    .ok_or(JavaArgumentsError::NotValidUtf8Path)?,
+            )
             .replace("${launcher_name}", &launcher_arguments.client_branding)
             .replace("${launcher_version}", &launcher_arguments.launcher_name)
+            .replace("${forge_version}", &launcher_arguments.forge_version)
             .replace(
+                "${versions_directory}",
+                canonicalize(&launcher_arguments.versions_directory)?
+                    .to_str()
+                    .ok_or(JavaArgumentsError::NotValidUtf8Path)?,
+            )
+			.replace(
                 "${classpath}",
                 classpath
                     .join(if cfg!(windows) { ";" } else { ":" })
                     .as_str(),
-            ))
+            )
+			.replace("${classpath_separator}", if cfg!(windows) { ";" } else { ":" })
+		)
     }
 
     #[tracing::instrument]

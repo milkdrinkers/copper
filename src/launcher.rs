@@ -57,6 +57,10 @@ pub struct Launcher {
     pub is_snapshot: bool,
     /// the version name
     pub version_name: String,
+	/// used to point to forge installer jar in forge launches
+	pub forge_version: String,
+	/// used to point to vanilla jar in forge launches
+	pub versions_directory: PathBuf,
     /// the client brand
     pub client_branding: String,
     /// the min/max amount of ram to use
