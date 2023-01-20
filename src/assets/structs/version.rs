@@ -31,6 +31,8 @@ pub struct Version {
     #[serde(rename = "javaVersion")]
     pub java_version: Option<JavaVersion>,
     pub libraries: Option<Vec<Library>>,
+    #[serde(rename = "mavenFiles")]
+    pub maven_files: Option<Vec<Library>>,
     pub logging: Option<Logging>,
     #[serde(rename = "mainClass")]
     pub main_class: Option<String>,
@@ -56,6 +58,7 @@ impl Version {
             id: None,
             java_version: None,
             libraries: None,
+            maven_files: None,
             logging: None,
             main_class: None,
             minimum_launcher_version: None,
@@ -118,6 +121,15 @@ impl Version {
                 .unwrap_or_default()
                 .into_iter()
                 .chain(lower.libraries.unwrap_or_default().into_iter())
+                .collect(),
+        );
+
+		// maven (combining)
+        merged.maven_files = Some(
+            self.maven_files
+                .unwrap_or_default()
+                .into_iter()
+                .chain(lower.maven_files.unwrap_or_default().into_iter())
                 .collect(),
         );
 
@@ -244,6 +256,67 @@ impl Version {
             }
         }
 
+		if self.maven_files.is_some() {
+			for library in self.maven_files.as_ref().ok_or(VersionError::NoLibs)? {
+				// Check rules for the library to see if it should be downloaded
+				if let Some(rules) = &library.rules {
+					debug!("Library {} has rules, checking them", library.name);
+					// if the rules are not satisfied, skip the library
+					if !Version::check_library_rules(rules) {
+						continue;
+					}
+				}
+	
+				debug!(
+					"Library {} has no rules or the rules passed, downloading",
+					library.name
+				);
+	
+				// if we get here, then the library is allowed to be downloaded
+				let download = if let Some(down) = &library.downloads {
+					down.to_owned()
+				} else {
+					create_library_download(
+						library.url.as_ref().unwrap(),
+						&library.name,
+						client.clone(),
+					)
+					.await?
+				};
+	
+				Self::create_save_task(&download.artifact, &save_path, library, &tasks, &client);
+	
+				if let Some(classifiers) = &download.classifiers {
+					match std::env::consts::OS {
+						"windows" => {
+							if let Some(windows) = &classifiers.natives_windows {
+								Self::create_save_task(windows, &save_path, library, &tasks, &client);
+							} else {
+								continue;
+							}
+						}
+						"macos" => {
+							if let Some(macos) = &classifiers.natives_macos {
+								Self::create_save_task(macos, &save_path, library, &tasks, &client);
+							} else if let Some(osx) = &classifiers.natives_osx {
+								Self::create_save_task(osx, &save_path, library, &tasks, &client);
+							} else {
+								continue;
+							}
+						}
+						"linux" => {
+							if let Some(linux) = &classifiers.natives_linux {
+								Self::create_save_task(linux, &save_path, library, &tasks, &client);
+							} else {
+								continue;
+							}
+						}
+						_ => return Err(VersionError::UnsupportedOs),
+					};
+				}
+			}	
+		}
+		
         debug!("Created {} library download tasks", tasks.len());
         Ok(tasks)
     }
