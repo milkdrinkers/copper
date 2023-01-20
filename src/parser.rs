@@ -106,7 +106,7 @@ impl GameArguments {
                 .to_str()
                 .ok_or(JavaArgumentsError::NotValidUtf8Path)?
                 .to_owned(),
-            "assets_index_name" => launcher_arguments.version_name.to_owned(),
+            "assets_index_name" => launcher_arguments.assets_version_name.to_owned(),
             "auth_uuid" => launcher_arguments
                 .authentication_details
                 .auth_details

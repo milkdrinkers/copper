@@ -49,6 +49,8 @@ pub struct Launcher {
     pub game_directory: PathBuf,
     /// the assets directory, this is the root of the assets folder
     pub assets_directory: PathBuf,
+	/// the asset index name
+	pub assets_version_name: String,
     /// the libraries directory, this is the root of the libraries folder
     pub libraries_directory: PathBuf,
     /// the path to <version>.json
