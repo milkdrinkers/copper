@@ -142,6 +142,9 @@ impl Launcher {
     ) -> Result<Vec<String>, LauncherError> {
         let mut args: Vec<String> = vec![];
 
+		args.push(format!("-Xms{}M", self.ram_size.min));
+		args.push(format!("-Xmx{}M", self.ram_size.max));
+
         for arg in version_manifest
             .arguments
             .as_ref()
