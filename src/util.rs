@@ -3,6 +3,7 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use futures::stream::FuturesUnordered;
+use futures::StreamExt;
 use reqwest::{Client, ClientBuilder};
 use tokio::fs::create_dir_all;
 use tokio::io::AsyncWriteExt;
@@ -35,23 +36,18 @@ pub fn create_download_task(
 
         let retry_strategy = FixedInterval::from_millis(100).take(3);
 
-        let mut response = Retry::spawn(retry_strategy, action).await?;
+        let response = Retry::spawn(retry_strategy, action).await?;
 
         trace!("Creating file at {}", &path.display());
-        let mut file = tokio::fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .append(true)
-            .create(true)
-            .open(&path)
-            .await?;
+        let mut file = tokio::fs::File::create(&path).await?;
 
-        trace!("Writing response to file"); 
+        trace!("Writing response to file");
+        let mut stream = response.bytes_stream();
 
-        while let Some(chunk) = response.chunk().await? {
+        while let Some(item) = stream.next().await {
+            let chunk = item?;
             file.write_all(&chunk).await?;
         }
-
         trace!("Wrote response to file");
 
         debug!("Downloaded {}", url);
