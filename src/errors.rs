@@ -118,10 +118,10 @@ pub enum DownloadError {
     /// The save path doesn't have a parent this happens if you do not specify the file name
     /// usually
     NoPathParent,
-
-    #[error("download.io_error(error={0})")]
+	
+	#[error("download.tokio_io_error(error={0})")]
     /// An error happened during an IO operation
-    IoError(#[from] std::io::Error),
+    TokioIoError(#[from] tokio::io::Error),
 
     #[error("download.request_error(error={0})")]
     /// An error happened with reqwest.
@@ -162,6 +162,12 @@ pub enum LauncherError {
     ///
     /// This usually happens when you forget to merge e.g A manifest that doesn't have any new args with the base one
     NoArgs,
+
+	#[error("Launcher.cannot_merge")]
+    /// version manifest merge failed
+    ///
+    /// This happens when the launcher fails to merge two version manifests
+    CannotMerge,
 }
 
 #[derive(Debug, Error)]

@@ -76,6 +76,13 @@ impl AssetIndex {
         for (path, url) in path_and_url.into_iter() {
             // because the path includes the file name, we need to remove the last part
             let full_path = save_path.join(path);
+			
+			// Checks if we need to download the file
+			if full_path.try_exists().expect("Failed to check if path exists for download") && full_path.is_file() {
+				trace!("Skipped file at {}", &full_path.display());
+				continue;
+			};
+
             debug!("Creating download task for {}", &full_path.display());
             tasks.push(create_download_task(url, full_path, Some(client.clone())));
         }

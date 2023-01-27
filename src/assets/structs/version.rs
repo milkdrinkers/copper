@@ -460,6 +460,13 @@ impl Version {
         .expect(format!("library {} doesnt have a path.", library.name).as_str());
 
         let full_path = save_path.join(sub_path);
+
+		// Checks if we need to download the file
+		if full_path.try_exists().expect("Failed to check if path exists for download") && full_path.is_file() {
+			trace!("Skipped file at {}", &full_path.display());
+			return;
+        };
+
         debug!(
             "Creating download task for library {}, saving to {}",
             library.name,
