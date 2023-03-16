@@ -1,15 +1,17 @@
-use std::{fs::create_dir_all, io::Write, path::PathBuf};
+use std::{fs::create_dir_all, io::Write, path::PathBuf, sync::Arc};
 
-use futures::{stream::FuturesUnordered, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::{
-    sync::watch::{self, Sender},
-    task,
+    sync::{
+        watch::{self, Sender},
+        OwnedSemaphorePermit, Semaphore,
+    },
+    task::{self, JoinSet},
 };
 use tracing::{debug, trace};
 
 use crate::{
-    errors::{DownloadError, VersionError},
+    errors::{DownloadError, DownloadTasks, VersionError},
     util::{
         create_client, create_download_task, create_library_download, DownloadProgress,
         DownloadWatcher, ListOfResultHandles,
@@ -19,6 +21,7 @@ use crate::{
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Version {
+    #[serde(rename = "inheritsFrom")]
     pub inherits_from: Option<String>,
     pub arguments: Option<Arguments>,
     #[serde(rename = "assetIndex")]
@@ -124,7 +127,7 @@ impl Version {
                 .collect(),
         );
 
-		// maven (combining)
+        // maven (combining)
         merged.maven_files = Some(
             self.maven_files
                 .unwrap_or_default()
@@ -195,7 +198,8 @@ impl Version {
         debug!("Downloading libraries");
         let client = create_client();
 
-        let tasks = FuturesUnordered::new();
+        let semaphore = Arc::new(Semaphore::new(75));
+        let mut tasks = JoinSet::new();
 
         for library in self.libraries.as_ref().ok_or(VersionError::NoLibs)? {
             // Check rules for the library to see if it should be downloaded
@@ -217,36 +221,71 @@ impl Version {
                 down.to_owned()
             } else {
                 create_library_download(
-                    library.url.as_ref().unwrap(),
+                    library.url.as_ref().ok_or(VersionError::NoLibDownloadUrl)?,
                     &library.name,
                     client.clone(),
                 )
                 .await?
             };
 
-            Self::create_save_task(&download.artifact, &save_path, library, &tasks, &client);
+            Self::create_save_task(
+                &download.artifact,
+                &save_path,
+                library,
+                &mut tasks,
+                &client,
+                semaphore.clone().acquire_owned().await?,
+            )?;
 
             if let Some(classifiers) = &download.classifiers {
                 match std::env::consts::OS {
                     "windows" => {
                         if let Some(windows) = &classifiers.natives_windows {
-                            Self::create_save_task(windows, &save_path, library, &tasks, &client);
+                            Self::create_save_task(
+                                windows,
+                                &save_path,
+                                library,
+                                &mut tasks,
+                                &client,
+                                semaphore.clone().acquire_owned().await?,
+                            )?;
                         } else {
                             continue;
                         }
                     }
                     "macos" => {
                         if let Some(macos) = &classifiers.natives_macos {
-                            Self::create_save_task(macos, &save_path, library, &tasks, &client);
+                            Self::create_save_task(
+                                macos,
+                                &save_path,
+                                library,
+                                &mut tasks,
+                                &client,
+                                semaphore.clone().acquire_owned().await?,
+                            )?;
                         } else if let Some(osx) = &classifiers.natives_osx {
-                            Self::create_save_task(osx, &save_path, library, &tasks, &client);
+                            Self::create_save_task(
+                                osx,
+                                &save_path,
+                                library,
+                                &mut tasks,
+                                &client,
+                                semaphore.clone().acquire_owned().await?,
+                            )?;
                         } else {
                             continue;
                         }
                     }
                     "linux" => {
                         if let Some(linux) = &classifiers.natives_linux {
-                            Self::create_save_task(linux, &save_path, library, &tasks, &client);
+                            Self::create_save_task(
+                                linux,
+                                &save_path,
+                                library,
+                                &mut tasks,
+                                &client,
+                                semaphore.clone().acquire_owned().await?,
+                            )?;
                         } else {
                             continue;
                         }
@@ -256,67 +295,102 @@ impl Version {
             }
         }
 
-		if self.maven_files.is_some() {
-			for library in self.maven_files.as_ref().ok_or(VersionError::NoLibs)? {
-				// Check rules for the library to see if it should be downloaded
-				if let Some(rules) = &library.rules {
-					debug!("Library {} has rules, checking them", library.name);
-					// if the rules are not satisfied, skip the library
-					if !Version::check_library_rules(rules) {
-						continue;
-					}
-				}
-	
-				debug!(
-					"Library {} has no rules or the rules passed, downloading",
-					library.name
-				);
-	
-				// if we get here, then the library is allowed to be downloaded
-				let download = if let Some(down) = &library.downloads {
-					down.to_owned()
-				} else {
-					create_library_download(
-						library.url.as_ref().unwrap(),
-						&library.name,
-						client.clone(),
-					)
-					.await?
-				};
-	
-				Self::create_save_task(&download.artifact, &save_path, library, &tasks, &client);
-	
-				if let Some(classifiers) = &download.classifiers {
-					match std::env::consts::OS {
-						"windows" => {
-							if let Some(windows) = &classifiers.natives_windows {
-								Self::create_save_task(windows, &save_path, library, &tasks, &client);
-							} else {
-								continue;
-							}
-						}
-						"macos" => {
-							if let Some(macos) = &classifiers.natives_macos {
-								Self::create_save_task(macos, &save_path, library, &tasks, &client);
-							} else if let Some(osx) = &classifiers.natives_osx {
-								Self::create_save_task(osx, &save_path, library, &tasks, &client);
-							} else {
-								continue;
-							}
-						}
-						"linux" => {
-							if let Some(linux) = &classifiers.natives_linux {
-								Self::create_save_task(linux, &save_path, library, &tasks, &client);
-							} else {
-								continue;
-							}
-						}
-						_ => return Err(VersionError::UnsupportedOs),
-					};
-				}
-			}	
-		}
-		
+        if self.maven_files.is_some() {
+            for library in self.maven_files.as_ref().ok_or(VersionError::NoLibs)? {
+                // Check rules for the library to see if it should be downloaded
+                if let Some(rules) = &library.rules {
+                    debug!("Library {} has rules, checking them", library.name);
+                    // if the rules are not satisfied, skip the library
+                    if !Version::check_library_rules(rules) {
+                        continue;
+                    }
+                }
+
+                debug!(
+                    "Library {} has no rules or the rules passed, downloading",
+                    library.name
+                );
+
+                // if we get here, then the library is allowed to be downloaded
+                let download = if let Some(down) = &library.downloads {
+                    down.to_owned()
+                } else {
+                    create_library_download(
+                        library.url.as_ref().ok_or(VersionError::NoLibDownloadUrl)?,
+                        &library.name,
+                        client.clone(),
+                    )
+                    .await?
+                };
+
+                Self::create_save_task(
+                    &download.artifact,
+                    &save_path,
+                    library,
+                    &mut tasks,
+                    &client,
+                    semaphore.clone().acquire_owned().await?,
+                )?;
+
+                if let Some(classifiers) = &download.classifiers {
+                    match std::env::consts::OS {
+                        "windows" => {
+                            if let Some(windows) = &classifiers.natives_windows {
+                                Self::create_save_task(
+                                    windows,
+                                    &save_path,
+                                    library,
+                                    &mut tasks,
+                                    &client,
+                                    semaphore.clone().acquire_owned().await?,
+                                )?;
+                            } else {
+                                continue;
+                            }
+                        }
+                        "macos" => {
+                            if let Some(macos) = &classifiers.natives_macos {
+                                Self::create_save_task(
+                                    macos,
+                                    &save_path,
+                                    library,
+                                    &mut tasks,
+                                    &client,
+                                    semaphore.clone().acquire_owned().await?,
+                                )?;
+                            } else if let Some(osx) = &classifiers.natives_osx {
+                                Self::create_save_task(
+                                    osx,
+                                    &save_path,
+                                    library,
+                                    &mut tasks,
+                                    &client,
+                                    semaphore.clone().acquire_owned().await?,
+                                )?;
+                            } else {
+                                continue;
+                            }
+                        }
+                        "linux" => {
+                            if let Some(linux) = &classifiers.natives_linux {
+                                Self::create_save_task(
+                                    linux,
+                                    &save_path,
+                                    library,
+                                    &mut tasks,
+                                    &client,
+                                    semaphore.clone().acquire_owned().await?,
+                                )?;
+                            } else {
+                                continue;
+                            }
+                        }
+                        _ => return Err(VersionError::UnsupportedOs),
+                    };
+                }
+            }
+        }
+
         debug!("Created {} library download tasks", tasks.len());
         Ok(tasks)
     }
@@ -330,7 +404,7 @@ impl Version {
         let total = tasks.len();
         let mut finished = 0;
 
-        while (tasks.next().await).is_some() {
+        while let Some(_res) = tasks.join_next().await {
             finished += 1;
             debug!("{}/{} library downloads finished", finished, total);
             let _ = progress_sender.send(DownloadProgress {
@@ -374,10 +448,16 @@ impl Version {
             .url
             .clone();
 
-        let task = tokio::spawn(create_download_task(url, save_path, None));
+        let semaphore = Arc::new(Semaphore::new(75));
+        let task = tokio::spawn(create_download_task(
+            url,
+            save_path,
+            None,
+            semaphore.acquire_owned().await?,
+        ));
 
         // the ultimate jank
-        task.await???;
+        task.await??;
 
         Ok(())
     }
@@ -391,10 +471,17 @@ impl Version {
             .server
             .url
             .clone();
-        let task = tokio::spawn(create_download_task(url, save_path, None));
+
+        let semaphore = Arc::new(Semaphore::new(75));
+        let task = tokio::spawn(create_download_task(
+            url,
+            save_path,
+            None,
+            semaphore.acquire_owned().await?,
+        ));
 
         // the ultimate jank
-        task.await???;
+        task.await??;
 
         Ok(())
     }
@@ -450,21 +537,22 @@ impl Version {
         mappings_class: &MappingsClass,
         save_path: &PathBuf,
         library: &Library,
-        tasks: &FuturesUnordered<task::JoinHandle<Result<(), DownloadError>>>,
+        tasks: &mut JoinSet<Result<(), DownloadError>>,
         client: &reqwest::Client,
-    ) {
+        semaphore: OwnedSemaphorePermit,
+    ) -> Result<(), DownloadTasks> {
         let url = mappings_class.url.clone();
-        let sub_path = mappings_class
-        .path
-        .as_ref()
-        .expect(format!("library {} doesnt have a path.", library.name).as_str());
+        let sub_path = match mappings_class.path.as_ref() {
+            Some(val) => val,
+            None => return Err(DownloadTasks::NoPath()), // format!("library {} doesnt have a path.", library.name).as_str()
+        };
 
         let full_path = save_path.join(sub_path);
 
-		// Checks if we need to download the file
-		if full_path.try_exists().expect("Failed to check if path exists for download") && full_path.is_file() {
-			trace!("Skipped file at {}", &full_path.display());
-			return;
+        // Checks if we need to download the file
+        if full_path.try_exists()? && full_path.is_file() {
+            trace!("Skipped file at {}", &full_path.display());
+            return Ok(());
         };
 
         debug!(
@@ -472,7 +560,13 @@ impl Version {
             library.name,
             full_path.display()
         );
-        tasks.push(create_download_task(url, full_path, Some(client.clone())));
+        tasks.spawn(create_download_task(
+            url,
+            full_path,
+            Some(client.clone()),
+            semaphore,
+        ));
+        Ok(())
     }
 }
 

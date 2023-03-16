@@ -131,7 +131,7 @@ impl GameArguments {
                 } else {
                     "release".to_string()
                 }
-            },
+            }
             "resolution_width" if launcher_arguments.custom_resolution.is_some() => {
                 launcher_arguments
                     .custom_resolution
@@ -139,7 +139,7 @@ impl GameArguments {
                     .ok_or(JavaArgumentsError::NoCustomResolutionProvided)?
                     .width
                     .to_string()
-            },
+            }
             "resolution_height" if launcher_arguments.custom_resolution.is_some() => {
                 launcher_arguments
                     .custom_resolution
@@ -147,7 +147,7 @@ impl GameArguments {
                     .ok_or(JavaArgumentsError::NoCustomResolutionProvided)?
                     .height
                     .to_string()
-            },
+            }
             _ => {
                 return Err(JavaArgumentsError::UnrecognisedGameArgument(
                     dynamic_argument.to_string(),
@@ -197,7 +197,7 @@ impl JavaArguments {
                     .to_str()
                     .ok_or(JavaArgumentsError::NotValidUtf8Path)?,
             )
-			.replace(
+            .replace(
                 "${library_directory}",
                 canonicalize(&launcher_arguments.libraries_directory)?
                     .to_str()
@@ -212,14 +212,16 @@ impl JavaArguments {
                     .to_str()
                     .ok_or(JavaArgumentsError::NotValidUtf8Path)?,
             )
-			.replace(
+            .replace(
                 "${classpath}",
                 classpath
                     .join(if cfg!(windows) { ";" } else { ":" })
                     .as_str(),
             )
-			.replace("${classpath_separator}", if cfg!(windows) { ";" } else { ":" })
-		)
+            .replace(
+                "${classpath_separator}",
+                if cfg!(windows) { ";" } else { ":" },
+            ))
     }
 
     #[tracing::instrument]
@@ -316,7 +318,10 @@ impl JavaArguments {
                 down.to_owned()
             } else {
                 create_library_download(
-                    library.url.as_ref().unwrap(),
+                    library
+                        .url
+                        .as_ref()
+                        .ok_or(JavaArgumentsError::NoDownloadUrlPath)?,
                     &library.name,
                     client.clone(),
                 )

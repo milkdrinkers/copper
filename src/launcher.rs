@@ -11,7 +11,7 @@ use tokio::fs;
 use tokio::io::BufReader;
 use tokio::process::{ChildStderr, ChildStdout, Command};
 use tokio::task::JoinHandle;
-use tracing::{debug, trace};
+use tracing::trace;
 
 #[derive(Default, Debug, Clone)]
 pub struct AuthenticationDetails {
@@ -50,8 +50,8 @@ pub struct Launcher {
     pub game_directory: PathBuf,
     /// the assets directory, this is the root of the assets folder
     pub assets_directory: PathBuf,
-	/// the asset index name
-	pub assets_version_name: String,
+    /// the asset index name
+    pub assets_version_name: String,
     /// the libraries directory, this is the root of the libraries folder
     pub libraries_directory: PathBuf,
     /// the path to <version>.json
@@ -60,10 +60,10 @@ pub struct Launcher {
     pub is_snapshot: bool,
     /// the version name
     pub version_name: String,
-	/// used to point to forge installer jar in forge launches
-	pub forge_version: String,
-	/// used to point to vanilla jar in forge launches
-	pub versions_directory: PathBuf,
+    /// used to point to forge installer jar in forge launches
+    pub forge_version: String,
+    /// used to point to vanilla jar in forge launches
+    pub versions_directory: PathBuf,
     /// the client brand
     pub client_branding: String,
     /// the min/max amount of ram to use
@@ -92,7 +92,7 @@ impl Launcher {
         };
 
         let game_args = self.parse_game_arguments(&version_manifest)?;
-        debug!("Game arguments: {:?}", &game_args);
+        println!("Game arguments: {:?}", &game_args);
 
         let java_args = self.parse_java_arguments(&version_manifest).await?;
 
@@ -101,13 +101,15 @@ impl Launcher {
             .as_ref()
             .ok_or(LauncherError::NoMainClass)?;
 
-        debug!("Java arguments: {:?}", &java_args);
-        debug!("main class: {}", main_class);
+        println!("");
+        println!("Java arguments: {:?}", &java_args);
+        println!("");
+        println!("Main class: {}", main_class);
 
         let mut process = Command::new(self.java_path.clone())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-			.current_dir(canonicalize(self.game_directory.clone())?)
+            .current_dir(canonicalize(self.game_directory.clone())?)
             .args(&java_args)
             .arg(main_class)
             .args(&game_args)
@@ -135,6 +137,29 @@ impl Launcher {
         })
     }
 
+    /* #[tracing::instrument]
+       async fn inherit_version(
+           &self,
+           version_manifest: &Version,
+       ) -> Result<(), LauncherError> {
+
+           Ok(match version_manifest.inherits_from {
+               Some(from_ver) => {
+                   // FIXME If version doesn't exist this will panic
+                   let versions_folder = self.assets_directory.clone().parent().unwrap().to_path_buf().join(format!("versions\\{}\\{}.json", self.version_name, self.version_name));
+                   let json_string = fs::read_to_string(versions_folder).await?;
+                   let inherited_manifest: Version = serde_json::from_str(json_string.as_str()).unwrap();
+
+                   // &version_manifest.merge(inherited_manifest);
+                   ()
+               },
+               None => {
+                   ()
+               },
+           })
+       }
+    */
+
     #[tracing::instrument]
     async fn parse_java_arguments(
         &self,
@@ -142,8 +167,8 @@ impl Launcher {
     ) -> Result<Vec<String>, LauncherError> {
         let mut args: Vec<String> = vec![];
 
-		args.push(format!("-Xms{}M", self.ram_size.min));
-		args.push(format!("-Xmx{}M", self.ram_size.max));
+        args.push(format!("-Xms{}M", self.ram_size.min));
+        args.push(format!("-Xmx{}M", self.ram_size.max));
 
         for arg in version_manifest
             .arguments

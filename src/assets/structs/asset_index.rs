@@ -1,16 +1,16 @@
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::Arc;
 
-use futures::stream::FuturesUnordered;
-use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::fs::create_dir_all;
 use tokio::sync::watch::{self, Sender};
-use tokio::task;
+use tokio::sync::Semaphore;
+use tokio::task::{self, JoinSet};
 use tracing::{debug, trace};
 
-use crate::errors::SaveError;
+use crate::errors::{DownloadTasks, SaveError};
 use crate::util::{
     create_client, create_download_task, DownloadProgress, DownloadWatcher, ListOfResultHandles,
 };
@@ -50,11 +50,15 @@ impl AssetIndex {
 
     /// The save path should be /assets/objects
     #[tracing::instrument]
-    pub async fn download_assets(&self, save_path: PathBuf) -> ListOfResultHandles {
+    pub async fn download_assets(
+        &self,
+        save_path: PathBuf,
+    ) -> Result<ListOfResultHandles, DownloadTasks> {
         trace!("Downloading assets");
         let client = create_client();
+        let semaphore = Arc::new(Semaphore::new(75));
+        let mut tasks = JoinSet::new();
 
-        let tasks = FuturesUnordered::new();
         // create a final path and return it along with the url
         let path_and_url: HashMap<String, String> = self
             .objects
@@ -76,19 +80,24 @@ impl AssetIndex {
         for (path, url) in path_and_url.into_iter() {
             // because the path includes the file name, we need to remove the last part
             let full_path = save_path.join(path);
-			
-			// Checks if we need to download the file
-			if full_path.try_exists().expect("Failed to check if path exists for download") && full_path.is_file() {
-				trace!("Skipped file at {}", &full_path.display());
-				continue;
-			};
+
+            // Checks if we need to download the file
+            if full_path.try_exists()? && full_path.is_file() {
+                trace!("Skipped file at {}", &full_path.display());
+                continue;
+            };
 
             debug!("Creating download task for {}", &full_path.display());
-            tasks.push(create_download_task(url, full_path, Some(client.clone())));
+            tasks.spawn(create_download_task(
+                url,
+                full_path,
+                Some(client.clone()),
+                semaphore.clone().acquire_owned().await?,
+            ));
         }
 
         debug!("Created {} asset download tasks", tasks.len());
-        tasks
+        Ok(tasks)
     }
 
     #[tracing::instrument]
@@ -100,7 +109,7 @@ impl AssetIndex {
         let total = tasks.len();
         let mut finished = 0;
 
-        while (tasks.next().await).is_some() {
+        while let Some(_res) = tasks.join_next().await {
             finished += 1;
             debug!("{}/{} asset downloads finished", finished, total);
             let _ = progress_sender.send(DownloadProgress {
@@ -113,7 +122,10 @@ impl AssetIndex {
     }
 
     #[tracing::instrument]
-    pub async fn start_download_assets(&self, save_path: PathBuf) -> DownloadWatcher {
+    pub async fn start_download_assets(
+        &self,
+        save_path: PathBuf,
+    ) -> Result<DownloadWatcher, DownloadTasks> {
         trace!("Starting download assets");
         trace!("Creating progress watcher");
         let (progress_sender, progress_receiver) = watch::channel(DownloadProgress {
@@ -122,13 +134,13 @@ impl AssetIndex {
         });
 
         trace!("Creating download tasks");
-        let tasks = self.download_assets(save_path).await;
+        let tasks = self.download_assets(save_path).await?;
         trace!("Starting download tasks");
         let download_task = task::spawn(Self::run_downloads(tasks, progress_sender));
 
-        DownloadWatcher {
+        Ok(DownloadWatcher {
             progress_watcher: progress_receiver,
             download_task,
-        }
+        })
     }
 }

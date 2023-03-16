@@ -2,13 +2,13 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::time::Duration;
 
-use futures::stream::FuturesUnordered;
-use futures::StreamExt;
+use futures::{Future, StreamExt};
 use reqwest::{Client, ClientBuilder};
 use tokio::fs::create_dir_all;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::watch::Receiver;
-use tokio::task::{self, JoinHandle};
+use tokio::sync::OwnedSemaphorePermit;
+use tokio::task::{JoinHandle, JoinSet};
 use tokio_retry::{strategy::FixedInterval, Retry};
 use tracing::{debug, trace};
 
@@ -20,9 +20,11 @@ pub fn create_download_task(
     url: String,
     path: PathBuf,
     client: Option<Client>,
-) -> JoinHandle<Result<(), DownloadError>> {
+    permit: OwnedSemaphorePermit,
+) -> impl Future<Output = Result<(), DownloadError>> {
     trace!("Creating download task for {}", url);
-    tokio::spawn(async move {
+    async move {
+        let _permit = permit;
         let client = client.clone().unwrap_or_else(create_client);
 
         create_dir_all(&path.parent().ok_or(DownloadError::NoPathParent)?).await?;
@@ -52,10 +54,10 @@ pub fn create_download_task(
 
         debug!("Downloaded {}", url);
         Ok(())
-    })
+    }
 }
 
-pub type ListOfResultHandles = FuturesUnordered<task::JoinHandle<Result<(), DownloadError>>>;
+pub type ListOfResultHandles = JoinSet<Result<(), DownloadError>>;
 
 // net.fabricmc:tiny-mappings-parser:0.3.0+build.17
 pub struct MavenIdentifier {

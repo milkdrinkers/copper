@@ -88,6 +88,10 @@ pub enum VersionError {
     /// This usually happens when you forget to merge e.g the fabric manifest with the base one
     NoLibs,
 
+    #[error("version.no_download_url")]
+    /// a download url was not provided by the version manifest
+    NoLibDownloadUrl,
+
     #[error("version.unsupported_os")]
     /// The OS the app is running on is unsupported. This shouldn't happen. If it does, please file
     /// a bug report
@@ -99,6 +103,10 @@ pub enum VersionError {
     /// This usually happens when you forget to merge e.g the fabric manifest with the base one
     NoDownloads,
 
+    #[error("version.download_tasks_error(error={0})")]
+    /// An error happened during creating a library download from a maven url
+    DownloadTasks(#[from] DownloadTasks),
+
     #[error("version.download_error(error={0})")]
     /// An error happened during a download
     DownloadErr(#[from] DownloadError),
@@ -107,9 +115,32 @@ pub enum VersionError {
     /// An error happened when trying to join/wait for a threads output
     JoinError(#[from] tokio::task::JoinError),
 
+    #[error("version.acquire_error")]
+    /// An error happened when trying to get a semaphore
+    AcquireError(#[from] tokio::sync::AcquireError),
+
     #[error("version.library_download_error(error={0})")]
     /// An error happened during creating a library download from a maven url
     LibraryDownloadError(#[from] CreateLibraryDownloadError),
+}
+
+#[derive(Error, Debug)]
+pub enum DownloadTasks {
+    #[error("version.no_path")]
+    /// The library doesn't have a path
+    NoPath(),
+
+    #[error("version.io_error(error={0})")]
+    /// An error happened during an IO operation
+    IoError(#[from] std::io::Error),
+
+    #[error("version.acquire_error")]
+    /// An error happened when trying to get a semaphore
+    AcquireError(#[from] tokio::sync::AcquireError),
+
+    #[error("version.download_error(error={0})")]
+    /// An error happened during a download
+    DownloadErr(#[from] DownloadError),
 }
 
 #[derive(Error, Debug)]
@@ -118,14 +149,18 @@ pub enum DownloadError {
     /// The save path doesn't have a parent this happens if you do not specify the file name
     /// usually
     NoPathParent,
-	
-	#[error("download.tokio_io_error(error={0})")]
+
+    #[error("download.tokio_io_error(error={0})")]
     /// An error happened during an IO operation
     TokioIoError(#[from] tokio::io::Error),
 
     #[error("download.request_error(error={0})")]
     /// An error happened with reqwest.
     RequestError(#[from] reqwest::Error),
+
+    #[error("version.acquire_error")]
+    /// An error happened when trying to get a semaphore
+    AcquireError(#[from] tokio::sync::AcquireError),
 }
 
 #[derive(Debug, Error)]
@@ -163,7 +198,7 @@ pub enum LauncherError {
     /// This usually happens when you forget to merge e.g A manifest that doesn't have any new args with the base one
     NoArgs,
 
-	#[error("Launcher.cannot_merge")]
+    #[error("Launcher.cannot_merge")]
     /// version manifest merge failed
     ///
     /// This happens when the launcher fails to merge two version manifests
@@ -196,6 +231,13 @@ pub enum JavaArgumentsError {
     /// This usually happens when you forget to merge e.g A manifest that doesn't have a modified
     /// download manifest path with the base one
     NoDownloadArtifactPath,
+
+    #[error("java_arguments.no_download_url_path")]
+    /// a download url path was not provided by the version manifest
+    ///
+    /// This usually happens when you forget to merge e.g A manifest that doesn't have a modified
+    /// download manifest path with the base one
+    NoDownloadUrlPath,
 
     #[error("java_arguments.no_libs_path")]
     /// No lib path was found
